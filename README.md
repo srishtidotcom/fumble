@@ -9,21 +9,19 @@
 
 ## 📌 What We're Building
 
-Fumble is an AI copilot that reads your text message conversations and tells you exactly what the mixed signals mean — no sugarcoating, no bias, just clarity.
+Fumble is an AI copilot iOS app that reads your text message conversations and tells you exactly what the mixed signals mean — no sugarcoating, no bias, just clarity.
 
 You paste a chat thread. Fumble analyzes response timing, message length patterns, initiation imbalance, tone shifts, topic avoidance, and other behavioral signals across the full conversation. It then gives you a plain-English breakdown of what's going on, a scored vibe meter, and optional reply suggestions based on what you're actually trying to accomplish.
 
 We're currently in the **build phase**, implementing the full feature set described below. This README tracks our progress, setup steps, and build process end-to-end.
 
-> **AI Strategy:** We're using the **Anthropic API (Claude Sonnet 4)** as the core inference layer throughout all phases. The signal detection logic, vibe scoring, and reply generation all run through Claude with structured prompts and JSON outputs.
-
 ---
 
 ## 👩‍💻 Team
 
-| Name | Role |
-|------|------|
-| Siya | Co-builder |
+| Name    | Role       |
+| ------- | ---------- |
+| Siya    | Co-builder |
 | Srishti | Co-builder |
 
 ---
@@ -35,7 +33,7 @@ We're currently in the **build phase**, implementing the full feature set descri
 3. [Environment Setup](#environment-setup)
 4. [Installation](#installation)
 5. [Build Process — Phase by Phase](#build-process)
-6. [Running the System](#running-the-system)
+6. [Running the App](#running-the-app)
 7. [Testing & Evaluation](#testing--evaluation)
 8. [Current Progress](#current-progress)
 9. [Known Issues](#known-issues)
@@ -45,29 +43,41 @@ We're currently in the **build phase**, implementing the full feature set descri
 ## 📁 Project Structure
 
 ```
-fumble/
-├── app/
-│   ├── page.tsx                  # Landing page
-│   ├── analyze/
-│   │   └── page.tsx              # Main analysis interface
-│   └── api/
-│       └── analyze/
-│           └── route.ts          # Anthropic API handler
-├── components/
-│   ├── ChatInput.tsx             # Paste / screenshot upload interface
-│   ├── ContextForm.tsx           # Optional context fields
-│   ├── SignalDebrief.tsx         # Signal analysis output cards
-│   ├── VibeScore.tsx             # Scored meter component
-│   └── ReplyOptions.tsx          # Suggested reply cards
-├── lib/
-│   ├── prompts.ts                # Fumble system prompts
-│   ├── signals.ts                # Signal detection & scoring logic
-│   └── parser.ts                 # Chat thread parser & normalizer
-├── types/
-│   └── index.ts                  # TypeScript types
-├── .env.example
-├── testing.md                    # Full testing guide
-└── README.md                     # ← You are here
+Fumble/
+├── Fumble.xcodeproj
+├── Fumble/
+│   ├── App/
+│   │   └── FumbleApp.swift              # App entry point
+│   ├── Views/
+│   │   ├── LandingView.swift            # Landing / onboarding screen
+│   │   ├── AnalyzeView.swift            # Main analysis interface
+│   │   ├── ChatInputView.swift          # Paste / photo import interface
+│   │   ├── ContextFormView.swift        # Optional context fields
+│   │   ├── SignalDebriefView.swift      # Signal analysis output cards
+│   │   ├── VibeScoreView.swift          # Scored meter component
+│   │   └── ReplyOptionsView.swift       # Suggested reply cards
+│   ├── Models/
+│   │   └── Models.swift                 # Swift data models & types
+│   ├── Services/
+│   │   ├── AIService.swift              # AI API client & request handling
+│   │   ├── ParserService.swift          # Chat thread parser & normalizer
+│   │   ├── SignalService.swift          # Signal detection & scoring logic
+│   │   └── OCRService.swift             # Vision framework OCR pipeline
+│   ├── Prompts/
+│   │   └── Prompts.swift                # System prompts & structured output schemas
+│   ├── Utils/
+│   │   └── Extensions.swift             # Swift extensions & helpers
+│   └── Resources/
+│       └── Assets.xcassets
+├── FumbleTests/
+│   ├── ParserTests.swift
+│   ├── SignalTests.swift
+│   └── Fixtures/                        # Sample thread JSON fixtures
+│       ├── sample_thread_ambivalent.json
+│       ├── sample_thread_fading.json
+│       ├── sample_thread_interested.json
+│       └── sample_thread_breadcrumbing.json
+└── README.md                            # ← You are here
 ```
 
 ---
@@ -78,35 +88,23 @@ Make sure the following are installed and configured before proceeding.
 
 ### System Requirements
 
-- OS: Ubuntu 22.04+ / Windows 11 with WSL2 / macOS 13+
-- RAM: 8 GB minimum
-- Node.js: 18+
-- Disk: 2 GB free space
+- macOS: 14.0 (Sonoma) or later
+- Xcode: 15.0+
+- iOS Deployment Target: iOS 17.0+
+- Device / Simulator: iPhone 14 or later recommended
 
 ### Required Tools
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Node.js | 18+ | Frontend + API routes |
-| npm | 9+ | Package management |
-| Git | Any | Version control |
-| Tesseract OCR | Latest | Screenshot import (Phase 3) |
+| Tool             | Version | Purpose                      |
+| ---------------- | ------- | ---------------------------- |
+| Xcode            | 15+     | IDE, build system, simulator |
+| Swift            | 5.9+    | Primary language             |
+| CocoaPods or SPM | Latest  | Dependency management        |
+| Git              | Any     | Version control              |
 
-### Installing Tesseract OCR
+### Apple Developer Account
 
-Required for the screenshot import feature (Phase 3). The `tesseract.js` npm package handles this in-browser, but for server-side processing install the binary:
-
-```bash
-# Ubuntu / Debian
-sudo apt-get install tesseract-ocr
-
-# macOS
-brew install tesseract
-
-# Windows
-# Download the installer from:
-# https://github.com/UB-Mannheim/tesseract/wiki
-```
+Required to run on a physical device. A free account works for development; a paid account ($99/year) is needed for TestFlight and App Store distribution.
 
 ---
 
@@ -117,49 +115,52 @@ brew install tesseract
 ```bash
 git clone https://github.com/Siya1202/fumble.git
 cd fumble
+open Fumble.xcodeproj
 ```
 
-### Step 2 — Copy Environment Variables
+### Step 2 — Configure API Keys
 
-```bash
-cp .env.example .env.local
+Create a `Secrets.plist` file in the `Fumble/Resources/` directory (this file is gitignored):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "...">
+<plist version="1.0">
+<dict>
+  <key>AI_API_KEY</key>
+  <string>your_api_key_here</string>
+  <key>AI_BASE_URL</key>
+  <string>https://your-ai-provider-endpoint.com</string>
+</dict>
+</plist>
 ```
 
-Open `.env.local` and fill in the required fields:
+Load secrets at runtime via a `SecretsManager` utility — never hardcode keys in source files.
 
-```env
-# Anthropic API
-ANTHROPIC_API_KEY=your_api_key_here
-
-# Supabase (optional — for session persistence in Phase 5)
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-
-# App config
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-> **Important:** The `ANTHROPIC_API_KEY` is required from Phase 1 onwards. Get one at [console.anthropic.com](https://console.anthropic.com). Sessions are ephemeral by default — Supabase is only needed if enabling opt-in conversation history in Phase 5.
+> **Important:** Add `Secrets.plist` to `.gitignore` before your first commit.
 
 ---
 
 ## 📦 Installation
 
-### Step 3 — Install Dependencies
+### Step 3 — Install Dependencies (Swift Package Manager)
 
-```bash
-npm install
-```
+Open `Fumble.xcodeproj` in Xcode, then go to:
 
-Key packages being installed:
+**File → Add Package Dependencies**
 
-```
-next react react-dom typescript
-tailwindcss
-@anthropic-ai/sdk
-tesseract.js              # In-browser OCR for screenshot imports
-zod                       # Schema validation for AI outputs
-```
+Add the following packages:
+
+| Package                                             | Purpose         |
+| --------------------------------------------------- | --------------- |
+| [Alamofire](https://github.com/Alamofire/Alamofire) | HTTP networking |
+
+All other functionality (OCR, JSON parsing, async/await) is handled natively by Apple frameworks:
+
+- **Vision** — On-device OCR for screenshot imports
+- **Foundation** — JSON decoding & networking primitives
+- **SwiftUI** — UI framework
+- **Combine / async-await** — Reactive state & async calls
 
 ---
 
@@ -171,112 +172,106 @@ Here's the full step-by-step build sequence we're following, phase by phase.
 
 ### Phase 0 — Project Setup & API Connection ✅ Complete
 
-**Goal:** Scaffold the Next.js app and verify Anthropic API connection.
+**Goal:** Scaffold the Xcode project and verify AI API connection.
 
-```bash
-npx create-next-app@latest fumble --typescript --tailwind --app
-cd fumble
-npm install @anthropic-ai/sdk
-```
+```swift
+// Services/AIService.swift
+import Foundation
 
-Test the API connection:
+struct AIService {
+    private let baseURL: String
+    private let apiKey: String
 
-```typescript
-// app/api/analyze/route.ts
-import Anthropic from "@anthropic-ai/sdk";
+    func analyze(prompt: String) async throws -> String {
+        var request = URLRequest(url: URL(string: "\(baseURL)/v1/messages")!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        let body: [String: Any] = [
+            "model": "your-model-id",
+            "max_tokens": 1000,
+            "messages": [["role": "user", "content": prompt]]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-export async function POST(req: Request) {
-  const { thread } = await req.json();
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1000,
-    messages: [{ role: "user", content: thread }],
-  });
-  return Response.json(response);
+        let (data, _) = try await URLSession.shared.data(for: request)
+        // Parse and return response
+        return String(data: data, encoding: .utf8) ?? ""
+    }
 }
 ```
 
-Verify:
+Verify by running the app in the simulator and triggering a test API call from `AnalyzeView`.
 
-```bash
-npm run dev
-curl -X POST http://localhost:3000/api/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"thread": "test message"}'
-```
-
--------
+---
 
 ### Phase 1 — Chat Thread Parser 🔨 In Progress
 
 **Goal:** Accept pasted text, normalize it into a structured message array with timestamps and sender labels.
 
 Input formats to handle:
+
 - Raw paste (iMessage copy-paste format)
 - WhatsApp export `.txt`
 - Manual entry
 
 Parser output schema:
 
-```typescript
-type ParsedThread = {
-  messages: {
-    sender: "you" | "them";
-    content: string;
-    timestamp?: string;
-    readAt?: string;
-  }[];
-  metadata: {
-    totalMessages: number;
-    initiationRatio: number;   // % of conversations started by each party
-    avgResponseGap?: number;   // in minutes
-  };
-};
+```swift
+// Models/Models.swift
+struct ParsedThread: Codable {
+    struct Message: Codable {
+        enum Sender: String, Codable { case you, them }
+        let sender: Sender
+        let content: String
+        let timestamp: String?
+        let readAt: String?
+    }
+    struct Metadata: Codable {
+        let totalMessages: Int
+        let initiationRatio: Double   // % of conversations started by each party
+        let avgResponseGap: Double?   // in minutes
+    }
+    let messages: [Message]
+    let metadata: Metadata
+}
 ```
 
-Build the parser:
+Build the parser in `Services/ParserService.swift`:
 
-```bash
-# lib/parser.ts
-# Handles: iMessage, WhatsApp, raw paste
-# Normalizes sender labels to "you" / "them"
-# Extracts timestamps where available
-```
+- Handles iMessage, WhatsApp, raw paste formats
+- Normalizes sender labels to `.you` / `.them`
+- Extracts timestamps where available
 
-Test the parser with sample threads:
-
-```bash
-npm run test:parser
-```
+Test with unit tests in `FumbleTests/ParserTests.swift`.
 
 ---
 
 ### Phase 2 — Signal Detection Engine 🔨 In Progress
 
-**Goal:** Build the core Claude-powered signal analysis. Takes a parsed thread and returns a structured signal report.
+**Goal:** Build the core AI-powered signal analysis. Takes a parsed thread and returns a structured signal report.
 
 Signal categories being detected:
 
-| Signal | What Fumble looks for |
-|--------|----------------------|
-| Response time patterns | Average reply latency, sudden changes, time-of-day shifts |
-| Message length shifts | Compression over time, effort asymmetry |
-| Initiation imbalance | Who starts conversations, how consistently |
-| Hot/cold cycles | Engagement spikes followed by withdrawal |
-| Tone and energy mismatch | Enthusiasm calibration between both parties |
-| Topic avoidance | Subjects deflected or left unacknowledged |
-| Future-plan language | Use of "we should," "sometime," "maybe" vs. concrete plans |
-| Breadcrumbing | Just enough engagement to maintain presence without real intent |
-| Orbiting signals | Passive engagement without active conversation |
-| Ghosting indicators | Pre-fade patterns before a communication drop |
+| Signal                   | What Fumble looks for                                           |
+| ------------------------ | --------------------------------------------------------------- |
+| Response time patterns   | Average reply latency, sudden changes, time-of-day shifts       |
+| Message length shifts    | Compression over time, effort asymmetry                         |
+| Initiation imbalance     | Who starts conversations, how consistently                      |
+| Hot/cold cycles          | Engagement spikes followed by withdrawal                        |
+| Tone and energy mismatch | Enthusiasm calibration between both parties                     |
+| Topic avoidance          | Subjects deflected or left unacknowledged                       |
+| Future-plan language     | Use of "we should," "sometime," "maybe" vs. concrete plans      |
+| Breadcrumbing            | Just enough engagement to maintain presence without real intent |
+| Orbiting signals         | Passive engagement without active conversation                  |
+| Ghosting indicators      | Pre-fade patterns before a communication drop                   |
 
 System prompt structure:
 
-```typescript
-// lib/prompts.ts
-export const SIGNAL_DETECTION_PROMPT = `
+```swift
+// Prompts/Prompts.swift
+let SIGNAL_DETECTION_PROMPT = """
 You are Fumble — a brutally honest, emotionally intelligent signal reader.
 Analyze the provided conversation thread and return a structured JSON report.
 
@@ -289,96 +284,91 @@ Return ONLY valid JSON. No preamble. No markdown. Schema:
   "summary": string,
   "replySuggestions": [{ "label": string, "message": string }]
 }
-`;
+"""
 ```
 
-Validate AI output schema with Zod:
+Output model with validation:
 
-```typescript
-import { z } from "zod";
-
-const SignalReportSchema = z.object({
-  signals: z.array(z.object({
-    type: z.string(),
-    severity: z.enum(["low", "medium", "high"]),
-    explanation: z.string(),
-  })),
-  vibeScore: z.object({
-    interested: z.number().min(0).max(100),
-    ambivalent: z.number().min(0).max(100),
-    pullingAway: z.number().min(0).max(100),
-  }),
-  summary: z.string(),
-  replySuggestions: z.array(z.object({
-    label: z.string(),
-    message: z.string(),
-  })),
-});
+```swift
+// Models/Models.swift
+struct SignalReport: Codable {
+    struct Signal: Codable {
+        enum Severity: String, Codable { case low, medium, high }
+        let type: String
+        let severity: Severity
+        let explanation: String
+    }
+    struct VibeScore: Codable {
+        let interested: Double      // 0–100, must sum to 100 with others
+        let ambivalent: Double
+        let pullingAway: Double
+    }
+    let signals: [Signal]
+    let vibeScore: VibeScore
+    let summary: String
+    let replySuggestions: [ReplySuggestion]
+}
 ```
 
 ---
 
 ### Phase 3 — Screenshot Import (OCR) ⬜ Not Started
 
-**Goal:** Allow users to upload a screenshot of a conversation instead of pasting text.
+**Goal:** Allow users to upload a screenshot of a conversation instead of pasting text. Uses Apple's on-device Vision framework — no third-party OCR needed.
 
-```bash
-npm install tesseract.js
-```
+```swift
+// Services/OCRService.swift
+import Vision
+import UIKit
 
-OCR pipeline:
+struct OCRService {
+    func extractText(from image: UIImage) async throws -> String {
+        guard let cgImage = image.cgImage else { throw OCRError.invalidImage }
 
-```typescript
-// lib/ocr.ts
-import Tesseract from "tesseract.js";
-
-export async function extractTextFromImage(imageFile: File): Promise<string> {
-  const { data: { text } } = await Tesseract.recognize(imageFile, "eng", {
-    logger: (m) => console.log(m),
-  });
-  return text;
+        return try await withCheckedThrowingContinuation { continuation in
+            let request = VNRecognizeTextRequest { request, error in
+                if let error { continuation.resume(throwing: error); return }
+                let text = (request.results as? [VNRecognizedTextObservation])?
+                    .compactMap { $0.topCandidates(1).first?.string }
+                    .joined(separator: "\n") ?? ""
+                continuation.resume(returning: text)
+            }
+            request.recognitionLevel = .accurate
+            request.usesLanguageCorrection = true
+            try? VNImageRequestHandler(cgImage: cgImage).perform([request])
+        }
+    }
 }
 ```
 
-After extraction, feed the raw OCR text through the same parser from Phase 1. Test against common screenshot formats:
-
-```bash
-# Test fixtures
-tests/fixtures/imessage_screenshot.png
-tests/fixtures/whatsapp_screenshot.png
-tests/fixtures/instagram_dm_screenshot.png
-```
+After extraction, feed the raw OCR text through the same parser from Phase 1. Test against common screenshot formats using fixtures in `FumbleTests/Fixtures/`.
 
 ---
 
 ### Phase 4 — UI — Analysis Interface ⬜ Not Started
 
-**Goal:** Build the main analysis interface — paste input, context form, and debrief output.
+**Goal:** Build the main analysis interface in SwiftUI — paste input, context form, and debrief output.
 
-Components to build:
+Views to build:
 
-- **ChatInput** — Large textarea for pasting threads, drag-and-drop for screenshots
-- **ContextForm** — Optional fields: relationship type, timeline, what's confusing you, your goal
-- **SignalDebrief** — Signal cards with severity badges and explanations
-- **VibeScore** — Three-bar confidence meter (Interested / Ambivalent / Pulling Away)
-- **ReplyOptions** — Labeled reply suggestion cards with copy button
+- **ChatInputView** — Large text editor for pasting threads, photo picker for screenshots
+- **ContextFormView** — Optional fields: relationship type, timeline, what's confusing you, your goal
+- **SignalDebriefView** — Signal cards with severity badges and explanations
+- **VibeScoreView** — Three-bar animated meter (Interested / Ambivalent / Pulling Away)
+- **ReplyOptionsView** — Labeled reply suggestion cards with copy-to-clipboard button
 
-```bash
-cd app
-# Build components in /components
-# Hook into /api/analyze route
-npm run dev
-# Test at http://localhost:3000/analyze
-```
-
-VibeScore component logic:
-
-```typescript
-// components/VibeScore.tsx
+```swift
+// Views/VibeScoreView.swift
 // Three scores must sum to 100
-// Animate meter fills on mount
-// Color: interested = green, ambivalent = amber, pullingAway = red
+// Animate bar fills on appear using withAnimation
+// Color: interested = .green, ambivalent = .orange, pullingAway = .red
+struct VibeScoreView: View {
+    let score: SignalReport.VibeScore
+    // ...
+}
 ```
+
+Test on iPhone 15 Pro simulator and physical device.
 
 ---
 
@@ -388,23 +378,24 @@ VibeScore component logic:
 
 Conversation state:
 
-```typescript
-type ConversationState = {
-  thread: ParsedThread;
-  context: UserContext;
-  history: { role: "user" | "assistant"; content: string }[];
-  signalReport: SignalReport;
-};
+```swift
+// Models/Models.swift
+struct ConversationState {
+    let thread: ParsedThread
+    let context: UserContext
+    var history: [(role: String, content: String)]
+    let signalReport: SignalReport
+}
 ```
 
-Each follow-up message appends to `history` and is sent back to Claude with the original thread and report as context:
+Each follow-up message appends to `history` and is sent back to the AI with the original thread and report as context:
 
-```typescript
+```swift
 messages: [
-  { role: "user", content: INITIAL_ANALYSIS_PROMPT },
-  { role: "assistant", content: JSON.stringify(signalReport) },
-  ...conversationHistory,
-  { role: "user", content: userFollowUp },
+    ["role": "user", "content": INITIAL_ANALYSIS_PROMPT],
+    ["role": "assistant", "content": encodedSignalReport],
+    ...conversationHistory,
+    ["role": "user", "content": userFollowUp]
 ]
 ```
 
@@ -424,26 +415,28 @@ Example follow-ups Fumble handles:
 **Goal:** Enforce ephemeral sessions by default. No conversation data persisted unless user explicitly opts in.
 
 Default behavior:
-- All thread data lives in React state only — never sent to a database
-- Sessions cleared on tab close
-- No logging of conversation content on the backend
 
-Opt-in persistence (requires Supabase):
+- All thread data lives in SwiftUI `@State` / `@StateObject` only — never written to disk
+- Sessions cleared when app is backgrounded or closed
+- No logging of conversation content in API requests
 
-```typescript
+Opt-in persistence (requires iCloud or local encrypted store):
+
+```swift
 // Only activated if user toggles "Remember this conversation"
-// Stores encrypted session blob in Supabase
-// User can delete at any time from settings
+// Store encrypted session data in Keychain or CloudKit
+// User can delete at any time from Settings
 ```
 
 Privacy audit checklist:
 
 ```
-[ ] No raw thread text logged in API route
-[ ] No PII fields in analytics events
-[ ] Session state cleared on unmount
-[ ] Supabase RLS policies enforce user-scoped access
-[ ] .env.local excluded from version control
+[ ] No raw thread text sent to analytics
+[ ] No PII in crash reports (use redacted summaries only)
+[ ] Session state cleared on scene disconnect
+[ ] Keychain entries scoped to app identifier
+[ ] Secrets.plist excluded from version control
+[ ] App Privacy Manifest (PrivacyInfo.xcprivacy) filled out accurately
 ```
 
 ---
@@ -452,14 +445,18 @@ Privacy audit checklist:
 
 **Goal:** For returning users who opt in to session history, surface trends across multiple conversations with the same person.
 
-```typescript
-type PatternInsight = {
-  person: string;           // user-assigned label, no real names stored
-  sessions: number;
-  trendDirection: "improving" | "declining" | "stagnant";
-  recurringSignals: string[];
-  recommendation: string;
-};
+```swift
+// Models/Models.swift
+struct PatternInsight: Codable {
+    enum TrendDirection: String, Codable {
+        case improving, declining, stagnant
+    }
+    let person: String           // user-assigned label, no real names stored
+    let sessions: Int
+    let trendDirection: TrendDirection
+    let recurringSignals: [String]
+    let recommendation: String
+}
 ```
 
 Insight examples:
@@ -471,81 +468,72 @@ Insight examples:
 
 ---
 
-### Phase 8 — Deployment ⬜ Not Started
+### Phase 8 — App Store Deployment ⬜ Not Started
 
-**Goal:** Deploy Fumble to production on Vercel.
-
-```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Deploy
-vercel --prod
-```
-
-Set production environment variables in Vercel dashboard:
-
-```
-ANTHROPIC_API_KEY
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-NEXT_PUBLIC_APP_URL
-```
-
-Build check before deploy:
+**Goal:** Submit Fumble to the App Store via TestFlight then production.
 
 ```bash
-npm run build
-npm run lint
+# Archive in Xcode
+Product → Archive → Distribute App → App Store Connect
+```
+
+Pre-submission checklist:
+
+```
+[ ] App icon complete (all required sizes via Assets.xcassets)
+[ ] Launch screen configured
+[ ] Privacy manifest (PrivacyInfo.xcprivacy) submitted
+[ ] App Store Connect listing: screenshots, description, keywords
+[ ] TestFlight beta tested on real devices
+[ ] All App Store Review Guidelines reviewed
+[ ] Age rating configured
+[ ] Data privacy questionnaire filled in App Store Connect
 ```
 
 ---
 
-## ▶️ Running the System
+## ▶️ Running the App
 
 Once Phases 0–4 are complete:
 
 ```bash
-# Start the development server
-npm run dev
+# Open in Xcode
+open Fumble.xcodeproj
 
-# Visit
-http://localhost:3000
+# Select target: iPhone 15 Pro simulator or your connected device
+# Press ▶ or Cmd+R to build and run
 ```
 
-For production build:
-
-```bash
-npm run build
-npm run start
-```
+For device testing, ensure your Apple ID is added under **Xcode → Settings → Accounts** and the signing team is set in **Target → Signing & Capabilities**.
 
 ---
 
 ## 🧪 Testing & Evaluation
 
-See [testing.md](./testing.md) for the full testing guide.
+Unit tests live in `FumbleTests/`. Run them via:
 
 ```bash
-# Run parser unit tests
-npm run test:parser
+# In Xcode
+Cmd+U
 
-# Run signal detection tests (requires ANTHROPIC_API_KEY)
-npm run test:signals
-
-# End-to-end test with sample thread
-curl -X POST http://localhost:3000/api/analyze \
-  -H "Content-Type: application/json" \
-  -d @tests/fixtures/sample_thread.json
+# Or via command line
+xcodebuild test -scheme Fumble -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
 ```
+
+Test targets:
+
+| Test File           | Coverage                                     |
+| ------------------- | -------------------------------------------- |
+| `ParserTests.swift` | iMessage, WhatsApp, raw paste parsing        |
+| `SignalTests.swift` | Signal detection accuracy on fixture threads |
 
 Sample thread fixtures:
 
 ```
-tests/fixtures/sample_thread_ambivalent.json    # Classic mixed signals
-tests/fixtures/sample_thread_fading.json        # Pre-ghosting pattern
-tests/fixtures/sample_thread_interested.json    # Positive engagement
-tests/fixtures/sample_thread_breadcrumbing.json # Low-intent re-engagement
+FumbleTests/Fixtures/sample_thread_ambivalent.json    # Classic mixed signals
+FumbleTests/Fixtures/sample_thread_fading.json        # Pre-ghosting pattern
+FumbleTests/Fixtures/sample_thread_interested.json    # Positive engagement
+FumbleTests/Fixtures/sample_thread_breadcrumbing.json # Low-intent re-engagement
 ```
 
 Vibe score accuracy target: **≥ 85% match with human-labeled ground truth** on test fixtures before v1.0.
@@ -554,17 +542,17 @@ Vibe score accuracy target: **≥ 85% match with human-labeled ground truth** on
 
 ## 📊 Current Progress
 
-| Phase | Status | Notes |
-|-------|--------|-------|
-| Phase 0 — Project Setup & API Connection | ✅ Complete | Scaffolded, API verified |
-| Phase 1 — Chat Thread Parser | 🔨 In Progress | iMessage format working, WhatsApp in testing |
-| Phase 2 — Signal Detection Engine | 🔨 In Progress | Prompts drafted, Zod schema validation in progress |
-| Phase 3 — Screenshot Import (OCR) | ⬜ Not Started | |
-| Phase 4 — UI — Analysis Interface | ⬜ Not Started | |
-| Phase 5 — Multi-turn Follow-up | ⬜ Not Started | |
-| Phase 6 — Privacy & Session Management | ⬜ Not Started | |
-| Phase 7 — Pattern-Over-Time Insights | ⬜ Not Started | |
-| Phase 8 — Deployment | ⬜ Not Started | |
+| Phase                                    | Status         | Notes                                               |
+| ---------------------------------------- | -------------- | --------------------------------------------------- |
+| Phase 0 — Project Setup & API Connection | ✅ Complete    | Scaffolded, API verified                            |
+| Phase 1 — Chat Thread Parser             | 🔨 In Progress | iMessage format working, WhatsApp in testing        |
+| Phase 2 — Signal Detection Engine        | 🔨 In Progress | Prompts drafted, JSON schema validation in progress |
+| Phase 3 — Screenshot Import (OCR)        | ⬜ Not Started |                                                     |
+| Phase 4 — UI — Analysis Interface        | ⬜ Not Started |                                                     |
+| Phase 5 — Multi-turn Follow-up           | ⬜ Not Started |                                                     |
+| Phase 6 — Privacy & Session Management   | ⬜ Not Started |                                                     |
+| Phase 7 — Pattern-Over-Time Insights     | ⬜ Not Started |                                                     |
+| Phase 8 — App Store Deployment           | ⬜ Not Started |                                                     |
 
 ---
 
@@ -572,28 +560,29 @@ Vibe score accuracy target: **≥ 85% match with human-labeled ground truth** on
 
 Once all phases are complete and stable:
 
-- **Voice message analysis** — Transcribe and analyze voice note threads
+- **Voice message analysis** — Transcribe and analyze voice note threads via Apple's Speech framework
 - **Anonymous community signals** — Aggregated pattern stats across all sessions (opt-in, anonymized): "72% of threads with this pattern resulted in a fade within 2 weeks"
 - **Fumble API** — Public API for third-party integrations
 - **Multi-platform parsing** — Native parsers for Instagram DMs, Hinge, Bumble chat exports
+- **iPad support** — Expanded layout for larger screens
+- **Widgets** — Quick-access vibe summaries on the home screen
 
 ---
 
 ## 🐛 Known Issues
 
-- OCR accuracy on dark-mode screenshots is lower — Tesseract performs better on light backgrounds. Preprocessing (contrast boost) planned for Phase 3.
-- Claude occasionally returns vibe scores that don't sum to 100 — Zod validation catches this and renormalizes. A stricter prompt fix is planned.
+- OCR accuracy on dark-mode screenshots is lower — Vision framework performs better on light backgrounds. Preprocessing (contrast boost) planned for Phase 3.
+- AI occasionally returns vibe scores that don't sum to 100 — JSON validation catches this and renormalizes. A stricter prompt fix is planned.
 - WhatsApp group chat exports include multiple senders — parser currently only handles 1:1 threads. Group support is post-v1.0.
-- No rate limiting on the `/api/analyze` route yet — to be added in Phase 6.
+- No request throttling on the AI service layer yet — to be added in Phase 6.
 
 ---
 
 ## 📎 References
 
-- [Anthropic API Docs](https://docs.anthropic.com)
-- [Claude Sonnet 4](https://www.anthropic.com/claude)
-- [Next.js 14 Docs](https://nextjs.org/docs)
-- [Tesseract.js](https://github.com/naptha/tesseract.js)
-- [Zod](https://zod.dev)
-- [Supabase](https://supabase.com/docs)
-- [Vercel](https://vercel.com/docs)
+- [Apple Developer Documentation](https://developer.apple.com/documentation/)
+- [SwiftUI](https://developer.apple.com/xcode/swiftui/)
+- [Vision Framework (OCR)](https://developer.apple.com/documentation/vision)
+- [Swift Concurrency](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/)
+- [App Store Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)
+- [TestFlight](https://developer.apple.com/testflight/)
